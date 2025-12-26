@@ -102,7 +102,9 @@ class VisionLanguageModel(nn.Module):
         Returns:
             None
         """
-        self.projector.load_state_dict(torch.load(projection_path))
+        self.projector.load_state_dict(
+            torch.load(projection_path, map_location=next(self.parameters()).device)
+        )
         return None
 
     def _get_vision_embeds(self, pixel_values: torch.Tensor) -> torch.Tensor:
@@ -254,6 +256,8 @@ class VisionLanguageModel(nn.Module):
         pixel_values: torch.Tensor | None,
         attention_mask: torch.Tensor,
         generation_config: VLMGenerationConfig = VLMGenerationConfig(),
+        *args,
+        **kwargs,
     ) -> torch.Tensor:
         """
         Generate text autoregressively using the VLM.

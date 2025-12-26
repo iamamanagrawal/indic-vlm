@@ -208,7 +208,9 @@ def apply_chat_template(
         "input_ids": torch.tensor(prompt_ids, dtype=torch.long),
         "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
         "image_path": image_path,
-        "targets": torch.tensor(targets, dtype=torch.long),
+        "targets": torch.tensor(targets, dtype=torch.long)
+        if add_generation_prompt
+        else None,
     }
 
 
