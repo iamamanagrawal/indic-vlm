@@ -2,6 +2,7 @@ import json
 from fastapi import FastAPI
 from pydantic import BaseModel
 import torch
+import traceback
 
 from src.schema import VLMModelConfig, VLMGenerationConfig
 from src.utils import apply_chat_template
@@ -56,18 +57,19 @@ async def generate(request: Request) -> Response:
 
     try:
         result = {k: v.to(device) if v is not None else None for k, v in result.items()}
-        generated_ids = model.generate(
-            input_ids=result["input_ids"],
-            pixel_values=result["pixel_values"],
-            attention_mask=result["attention_mask"],
-            generation_config=VLMGenerationConfig(),
-        )
+        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+            generated_ids = model.generate(
+                input_ids=result["input_ids"],
+                pixel_values=result["pixel_values"],
+                attention_mask=result["attention_mask"],
+                generation_config=VLMGenerationConfig(),
+            )
         generated_text = tokenizer.batch_decode(
             generated_ids, skip_special_tokens=True
         )[0]
         return {"status": True, "response": generated_text}
-    except Exception as e:
-        return {"status": False, "error": str(e)}
+    except Exception:
+        return {"status": False, "error": traceback.format_exc()}
 
 
 @app.on_event("startup")
@@ -79,13 +81,7 @@ def init_vlm() -> None:
         attn_implementation="sdpa",
     )
     global tokenizer, vision_processor, model, device
-    device = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
-    )
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     tokenizer, language_model = load_tokenizer_and_model(config)
     vision_processor, vision_model = load_vision_processor_and_model(config)
 
