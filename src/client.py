@@ -1,3 +1,4 @@
+import time
 import json
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -26,6 +27,7 @@ class Request(BaseModel):
 class Response(BaseModel):
     status: bool
     response: str | None = None
+    generation_time: float | None = None
     error: str | None = None
 
 
@@ -57,6 +59,7 @@ async def generate(request: Request) -> Response:
 
     try:
         result = {k: v.to(device) if v is not None else None for k, v in result.items()}
+        start_time = time.time()
         with torch.autocast(device_type=device, dtype=torch.bfloat16):
             generated_ids = model.generate(
                 input_ids=result["input_ids"],
@@ -64,10 +67,15 @@ async def generate(request: Request) -> Response:
                 attention_mask=result["attention_mask"],
                 generation_config=VLMGenerationConfig(),
             )
+        end_time = time.time()
         generated_text = tokenizer.batch_decode(
             generated_ids, skip_special_tokens=True
         )[0]
-        return {"status": True, "response": generated_text}
+        return {
+            "status": True,
+            "response": generated_text,
+            "generation_time": end_time - start_time,
+        }
     except Exception:
         return {"status": False, "error": traceback.format_exc()}
 

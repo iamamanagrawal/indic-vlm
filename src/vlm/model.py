@@ -291,4 +291,6 @@ class VisionLanguageModel(nn.Module):
             top_p=generation_config.top_p,
             temperature=generation_config.temperature,
             do_sample=generation_config.do_sample,
+            repetition_penalty=generation_config.repetition_penalty,
+            use_cache=generation_config.use_cache,
         )

@@ -98,17 +98,5 @@ class VLMGenerationConfig:
     top_p: float = 0.9
     temperature: float = 0.7
     do_sample: bool = True
-
-
-@dataclass
-class VLMInferenceConfig:
-    """
-    Configuration for VLM inference.
-
-    Attributes:
-        conversation: List of conversation turns for inference.
-        generation_config: Generation configuration for the model.
-    """
-
-    conversation: list
-    generation_config: VLMGenerationConfig
+    repetition_penalty: float = 1.2
+    use_cache: bool = True
