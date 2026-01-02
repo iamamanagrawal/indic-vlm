@@ -5,10 +5,11 @@ from pydantic import BaseModel
 import torch
 import traceback
 
-from src.schema import VLMModelConfig, VLMGenerationConfig
+from transformers import AutoTokenizer, SiglipImageProcessor
+
+from src.schema import VLMGenerationConfig
 from src.utils import apply_chat_template
 from src.vlm.model import VisionLanguageModel
-from src.utils import load_tokenizer_and_model, load_vision_processor_and_model
 
 
 app = FastAPI()
@@ -40,20 +41,14 @@ async def read_root():
 async def generate(request: Request) -> Response:
     result = apply_chat_template(
         tokenizer,
+        vision_processor,
         [json.loads(message.model_dump_json()) for message in request.messages],
         add_generation_prompt=True,
-    )
-    pixel_values = (
-        vision_processor(images=result["image_path"], return_tensors="pt")[
-            "pixel_values"
-        ]
-        if len(result["image_path"]) > 0
-        else None
     )
 
     result = {
         "input_ids": result["input_ids"].unsqueeze(0),
-        "pixel_values": pixel_values,
+        "pixel_values": result["pixel_values"],
         "attention_mask": result["attention_mask"].unsqueeze(0),
     }
 
@@ -82,20 +77,14 @@ async def generate(request: Request) -> Response:
 
 @app.on_event("startup")
 def init_vlm() -> None:
-    config = VLMModelConfig(
-        language_model="models/gemma-3-1b-it",
-        vision_model="models/siglip-base-patch16-256-multilingual",
-        num_image_tokens=64,
-        attn_implementation="sdpa",
-    )
     global tokenizer, vision_processor, model, device
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer, language_model = load_tokenizer_and_model(config)
-    vision_processor, vision_model = load_vision_processor_and_model(config)
+    model = VisionLanguageModel.from_pretrained("checkpoints/vlm_gemma_siglip")
+    tokenizer = AutoTokenizer.from_pretrained("checkpoints/vlm_gemma_siglip/tokenizer")
+    vision_processor = SiglipImageProcessor.from_pretrained(
+        "checkpoints/vlm_gemma_siglip/vision_processor"
+    )
 
-    model = VisionLanguageModel(language_model, vision_model)
-    model.from_pretrained_projection("checkpoints/projector.pth")
-
-    model.to(device)
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    model.to(device=device)
     model.eval()
     return None

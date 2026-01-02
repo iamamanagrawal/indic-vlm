@@ -122,7 +122,7 @@ HI_USERS_QUESTIONS = [
 
 
 def apply_chat_template(
-    tokenizer, conversation, add_generation_prompt=False
+    tokenizer, vision_processor, conversation, add_generation_prompt=False
 ) -> dict[str, torch.Tensor | list[str]]:
     """
     Apply chat template to the conversation and convert to token IDs.
@@ -130,7 +130,7 @@ def apply_chat_template(
     Args:
         tokenizer: The tokenizer used for tokenization. Must have 'num_image_tokens' attribute.
         conversation (list[dict]): A list of conversation turns, where each turn is a
-            dictionary with 'role', 'content', and optional 'image_path' keys.
+            dictionary with 'role', 'content', and optional 'pixel_values' keys.
         add_generation_prompt (bool): Whether to add a generation prompt for the
             assistant at the end of the conversation.
 
@@ -138,16 +138,13 @@ def apply_chat_template(
         dict: A dictionary containing:
             - input_ids: Tensor of token IDs for the conversation.
             - attention_mask: Tensor of attention mask.
-            - image_path: List of image paths from the conversation.
+            - pixel_values: Tensor of processed image pixel values.
             - targets: Tensor of target IDs for training (with -100 for non-target tokens).
 
     Raises:
         AssertionError: If tokenizer lacks 'num_image_tokens' or conversation is empty.
         ValueError: If last turn is not from user when add_generation_prompt is True.
     """
-    assert hasattr(tokenizer, "num_image_tokens"), (
-        "Tokenizer must have 'num_image_tokens' attribute."
-    )
     assert len(conversation) > 0, "Conversation must have at least one turn."
 
     if add_generation_prompt:
@@ -188,7 +185,8 @@ def apply_chat_template(
 
                 image_ids = (
                     [tokenizer.boi_token_id]
-                    + [tokenizer.image_token_id] * tokenizer.num_image_tokens
+                    + [tokenizer.image_token_id]
+                    * tokenizer.init_kwargs["num_image_tokens"]
                     + [tokenizer.eoi_token_id]
                 )
                 prompt_ids.extend(image_ids * num_images)
@@ -207,7 +205,11 @@ def apply_chat_template(
     return {
         "input_ids": torch.tensor(prompt_ids, dtype=torch.long),
         "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
-        "image_path": image_path,
+        "pixel_values": vision_processor(
+            images=image_path, return_tensors="pt"
+        ).pixel_values
+        if len(image_path) > 0
+        else None,
         "targets": torch.tensor(targets, dtype=torch.long)
         if add_generation_prompt
         else None,
@@ -245,8 +247,8 @@ def load_tokenizer_and_model(
             ]
         }
     )
-    tokenizer.num_image_tokens = config.num_image_tokens
-    model.image_token_id = tokenizer.convert_tokens_to_ids(tokenizer.image_token)
+    tokenizer.init_kwargs = {"num_image_tokens": config.num_image_tokens}
+    model.config.image_token_id = tokenizer.convert_tokens_to_ids(tokenizer.image_token)
     model.resize_token_embeddings(len(tokenizer))
 
     return tokenizer, model

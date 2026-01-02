@@ -99,7 +99,7 @@ class DataLoader:
 
         input_ids = []
         attention_mask = []
-        image_paths = []
+        pixel_values = []
         targets = []
 
         for conversation in batch:
@@ -109,7 +109,7 @@ class DataLoader:
             )
             input_ids.append(result["input_ids"])
             attention_mask.append(result["attention_mask"])
-            image_paths.append(result["image_path"])
+            pixel_values.append(result["pixel_values"])
             targets.append(result["targets"])
 
         max_len = max(len(ids) for ids in input_ids)
@@ -127,18 +127,14 @@ class DataLoader:
             )
             padded_targets.append(torch.cat([tgt, torch.full((pad_len,), -100)]))
 
-        pixel_values = None
-        if any(path is not None for path in image_paths):
-            pixel_values = self.vision_processor(image_paths, return_tensors="pt")[
-                "pixel_values"
-            ]
-
         input_ids_tensor = torch.stack(padded_input_ids)[:, : self.max_length]
 
         return {
             "input_ids": input_ids_tensor,
             "attention_mask": torch.stack(padded_attention_mask)[:, : self.max_length],
-            "pixel_values": pixel_values,
+            "pixel_values": torch.stack(pixel_values)
+            if len(pixel_values) > 0
+            else None,
             "targets": torch.stack(padded_targets)[:, : self.max_length],
             "num_tokens": (input_ids_tensor != self.tokenizer.pad_token_id)
             .sum()

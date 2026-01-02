@@ -4,9 +4,18 @@ This module implements the VisionLanguageModel class which combines vision and
 language models with a modality projector for multimodal understanding.
 """
 
+import os
+import json
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from safetensors.torch import load_file, save_model
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    SiglipVisionConfig,
+    SiglipVisionModel,
+)
 
 from src.schema import VLMGenerationConfig
 
@@ -172,7 +181,7 @@ class VisionLanguageModel(nn.Module):
         vision_embeds = vision_embeds.to(device=device, dtype=input_embds.dtype)
 
         # Find image token masks
-        img_token_mask = (input_ids == self.language_model.image_token_id).to(
+        img_token_mask = (input_ids == self.language_model.config.image_token_id).to(
             device=device, dtype=torch.bool
         )
         img_token_mask = img_token_mask.unsqueeze(-1).expand(
@@ -294,3 +303,61 @@ class VisionLanguageModel(nn.Module):
             repetition_penalty=generation_config.repetition_penalty,
             use_cache=generation_config.use_cache,
         )
+
+    @classmethod
+    def from_pretrained(cls, load_path: str) -> "VisionLanguageModel":
+        with open(os.path.join(load_path, "config.json")) as f:
+            config = json.load(f)
+
+        # Rebuild language model from config
+        lm_config = AutoConfig.for_model(**config["language_model"])
+        language_model = AutoModelForCausalLM.from_config(lm_config)
+
+        # Rebuild vision model from config
+        vision_config = SiglipVisionConfig(**config["vision_model"])
+        vision_dtype_str = config["vision_model"].get("dtype", "float32")
+        vision_dtype = getattr(torch, vision_dtype_str, torch.float32)
+        vision_model = SiglipVisionModel(vision_config).to(dtype=vision_dtype)
+
+        # Construct VLM instance
+        model = cls(
+            language_model=language_model,
+            vision_model=vision_model,
+        )
+
+        # Load weights and tie weights
+        state_dict = load_file(os.path.join(load_path, "model.safetensors"))
+        model.load_state_dict(state_dict, strict=False)
+        model.language_model.model.embed_tokens.weight = (
+            model.language_model.lm_head.weight
+        )
+        model.language_model.tie_weights()
+
+        model.eval()
+        return model
+
+    def save(self, save_path: str) -> None:
+        """
+        Save the VLM model weights to checkpoint.
+
+        Args:
+            save_path (str): Path to save the VLM checkpoint file.
+        Returns:
+            None
+        """
+        os.makedirs(save_path, exist_ok=True)
+        save_model(self, os.path.join(save_path, "model.safetensors"))
+        config = {
+            "model_type": "vision_language_model",
+            "language_model": self.language_model.config.to_dict(),
+            "vision_model": self.vision_model.config.to_dict(),
+            "projector": {
+                "vision_dim": self.vision_model.config.hidden_size,
+                "hidden_dim": self.language_model.config.hidden_size,
+            },
+        }
+
+        with open(os.path.join(save_path, "config.json"), "w") as f:
+            json.dump(config, f, indent=2)
+
+        return None

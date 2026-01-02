@@ -281,13 +281,6 @@ class PreTrainer(BaseTrainer):
                 add_generation_prompt=True,
             )
 
-            result["pixel_values"] = None
-            if "image_path" in result and result["image_path"] is not None:
-                image = self.vision_processor(
-                    images=result["image_path"], return_tensors="pt"
-                ).pixel_values
-                result["pixel_values"] = image
-
             with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
                 generated_ids = self.model.generate(
                     input_ids=result["input_ids"].unsqueeze(0).to(self.device),
