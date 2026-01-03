@@ -277,6 +277,7 @@ class PreTrainer(BaseTrainer):
         for conversation in self.example_conversation:
             result = apply_chat_template(
                 self.tokenizer,
+                self.vision_processor,
                 conversation,
                 add_generation_prompt=True,
             )

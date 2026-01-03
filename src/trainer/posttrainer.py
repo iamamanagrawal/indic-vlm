@@ -8,6 +8,7 @@ from torch.optim import AdamW
 
 from src.logger import logger
 from src.trainer.base import BaseTrainer
+from src.utils import apply_chat_template
 
 
 class PostTrainer(BaseTrainer):
@@ -122,3 +123,38 @@ class PostTrainer(BaseTrainer):
         self.model.save(self.train_config.checkpoint_dir)
 
         return None
+
+    @torch.inference_mode()
+    def inference(self) -> str:
+        """
+        Perform inference on the example conversation.
+
+        Returns:
+            str: Generated text output from the model.
+        """
+        outputs = list()
+        for conversation in self.example_conversation:
+            result = apply_chat_template(
+                self.tokenizer,
+                self.vision_processor,
+                conversation,
+                add_generation_prompt=True,
+            )
+
+            with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
+                generated_ids = self.model.generate(
+                    input_ids=result["input_ids"].unsqueeze(0).to(self.device),
+                    pixel_values=result["pixel_values"].to(self.device)
+                    if result["pixel_values"] is not None
+                    else None,
+                    attention_mask=result["attention_mask"]
+                    .unsqueeze(0)
+                    .to(self.device),
+                )
+
+            output_text = self.tokenizer.decode(
+                generated_ids[0], skip_special_tokens=True
+            )
+            outputs.append(output_text)
+
+        return outputs

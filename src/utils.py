@@ -249,7 +249,7 @@ def load_tokenizer_and_model(
     )
     tokenizer.init_kwargs = {"num_image_tokens": config.num_image_tokens}
     model.config.image_token_id = tokenizer.convert_tokens_to_ids(tokenizer.image_token)
-    model.resize_token_embeddings(len(tokenizer))
+    model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 
     return tokenizer, model
 

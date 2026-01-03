@@ -108,8 +108,10 @@ def main():
 
     checkpoint_dir = args.checkpoint_dir
     model = VisionLanguageModel.from_pretrained(checkpoint_dir)
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir)
-    vision_processor = SiglipImageProcessor.from_pretrained(checkpoint_dir)
+    tokenizer = AutoTokenizer.from_pretrained(f"{checkpoint_dir}/tokenizer")
+    vision_processor = SiglipImageProcessor.from_pretrained(
+        f"{checkpoint_dir}/vision_processor"
+    )
 
     train_config = VLMTrainerConfig(
         use_muon=args.use_muon,
