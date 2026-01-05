@@ -78,13 +78,20 @@ async def generate(request: Request) -> Response:
 @app.on_event("startup")
 def init_vlm() -> None:
     global tokenizer, vision_processor, model, device
-    model = VisionLanguageModel.from_pretrained("checkpoints/vlm_gemma_siglip")
-    tokenizer = AutoTokenizer.from_pretrained("checkpoints/vlm_gemma_siglip/tokenizer")
+    checkpoint_dir = "checkpoints/indic-vlm"
+    model = VisionLanguageModel.from_pretrained(checkpoint_dir)
+    tokenizer = AutoTokenizer.from_pretrained(f"{checkpoint_dir}/tokenizer")
     vision_processor = SiglipImageProcessor.from_pretrained(
-        "checkpoints/vlm_gemma_siglip/vision_processor"
+        f"{checkpoint_dir}/vision_processor"
     )
 
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
     model.to(device=device)
     model.eval()
     return None
