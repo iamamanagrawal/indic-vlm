@@ -4,7 +4,6 @@ This module defines the abstract base class for VLM trainers,
 providing a common interface for different training strategies.
 """
 
-import torch
 
 from torch.optim import Optimizer
 from abc import ABC, abstractmethod
@@ -13,6 +12,7 @@ from dataclasses import dataclass, field
 from src.schema import VLMTrainerConfig
 from src.data.dataloader import DataLoader
 from src.vlm.model import VisionLanguageModel
+from src.utils import get_device
 
 
 @dataclass
@@ -39,13 +39,7 @@ class BaseTrainer(ABC):
 
     train_dataloader: DataLoader
     val_dataloader: DataLoader
-    device: str = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
-    )
+    device: str = field(default_factory=get_device)
 
     optimizer: Optimizer | None = None
     # Example conversation for inference during training

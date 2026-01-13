@@ -1,7 +1,14 @@
+"""Post-trainer implementation for VLM models.
+
+This module implements the PostTrainer class which handles the post-training
+(fine-tuning) loop for vision-language models after pre-training.
+"""
+
 import time
 import wandb
 import torch
 
+from dataclasses import dataclass
 from torch.amp import GradScaler
 from torch.nn.utils import clip_grad_norm_
 from torch.optim import AdamW
@@ -11,8 +18,22 @@ from src.trainer.base import BaseTrainer
 from src.utils import apply_chat_template
 
 
+@dataclass
 class PostTrainer(BaseTrainer):
+    """
+    Post-trainer for Vision-Language Models.
+
+    This class implements the post-training (fine-tuning) loop with features like
+    gradient accumulation, model freezing, and inference during training.
+    """
+
     def __post_init__(self):
+        """
+        Initialize the post-trainer with model setup and configuration.
+
+        Sets up device, freezes models if specified, compiles model if needed,
+        and initializes optimizer and gradient scaler.
+        """
         wandb.init(project="indic-vlm-posttraining")
 
         self.model.to(self.device)
@@ -44,7 +65,13 @@ class PostTrainer(BaseTrainer):
         logger.info(f"Total parameters: {total_params / 1e6:.2f}M")
         logger.info(f"Trainable parameters: {trainable_params / 1e9:.3f}B")
 
-    def setup_optimizer(self):
+    def setup_optimizer(self) -> None:
+        """
+        Set up the AdamW optimizer for post-training.
+
+        Returns:
+            None
+        """
         trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
         self.optimizer = AdamW(
             trainable_params,
@@ -52,12 +79,30 @@ class PostTrainer(BaseTrainer):
         )
         return None
 
-    def save_checkpoint(self, path: str):
+    def save_checkpoint(self, path: str) -> None:
+        """
+        Save the model checkpoint to disk.
+
+        Args:
+            path (str): Path to save the model checkpoint file.
+
+        Returns:
+            None
+        """
         torch.save(self.model.state_dict(), path)
         logger.info(f"Model checkpoint saved at {path}")
         return None
 
-    def train(self):
+    def train(self) -> None:
+        """
+        Execute the main post-training loop.
+
+        Performs gradient accumulation, gradient clipping, optimizer steps,
+        validation, and logging to wandb.
+
+        Returns:
+            None
+        """
         logger.info("Starting post-training...")
 
         for _ in range(self.total_steps):

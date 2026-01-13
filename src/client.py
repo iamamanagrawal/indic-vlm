@@ -1,3 +1,9 @@
+"""FastAPI client for VLM inference.
+
+This module provides a REST API for generating text from images
+using the Vision-Language Model.
+"""
+
 import time
 import json
 from fastapi import FastAPI
@@ -8,24 +14,30 @@ import traceback
 from transformers import AutoTokenizer, SiglipImageProcessor
 
 from src.schema import VLMGenerationConfig
-from src.utils import apply_chat_template
+from src.utils import apply_chat_template, get_device
 from src.vlm.model import VisionLanguageModel
 
 
-app = FastAPI()
+app = FastAPI(title="Indic VLM API", description="Vision-Language Model inference API")
 
 
 class Message(BaseModel):
+    """A single message in a conversation."""
+
     role: str
     content: str
     image_path: str | None = None
 
 
 class Request(BaseModel):
+    """Request body for generation endpoint."""
+
     messages: list[Message]
 
 
 class Response(BaseModel):
+    """Response body from generation endpoint."""
+
     status: bool
     response: str | None = None
     generation_time: float | None = None
@@ -77,6 +89,7 @@ async def generate(request: Request) -> Response:
 
 @app.on_event("startup")
 def init_vlm() -> None:
+    """Initialize the VLM model, tokenizer, and vision processor on startup."""
     global tokenizer, vision_processor, model, device
     checkpoint_dir = "checkpoints/indic-vlm"
     model = VisionLanguageModel.from_pretrained(checkpoint_dir)
@@ -85,13 +98,7 @@ def init_vlm() -> None:
         f"{checkpoint_dir}/vision_processor"
     )
 
-    device = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
-    )
+    device = get_device()
     model.to(device=device)
     model.eval()
     return None

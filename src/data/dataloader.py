@@ -105,7 +105,10 @@ class DataLoader:
         for conversation in batch:
             assert isinstance(conversation, list), "Each conversation must be a list."
             result = apply_chat_template(
-                self.tokenizer, conversation, add_generation_prompt=False
+                self.tokenizer,
+                self.vision_processor,
+                conversation,
+                add_generation_prompt=False,
             )
             input_ids.append(result["input_ids"])
             attention_mask.append(result["attention_mask"])

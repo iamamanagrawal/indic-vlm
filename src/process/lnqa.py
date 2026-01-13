@@ -1,3 +1,9 @@
+"""LNQA dataset processing module.
+
+This module provides functionality for translating the LNQA (Long-form Natural
+Question Answering) dataset from English to Hindi and uploading to Hugging Face.
+"""
+
 import os
 import json
 import torch
@@ -9,23 +15,44 @@ from IndicTransToolkit.processor import IndicProcessor
 from datasets import load_dataset, Dataset
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+from src.utils import get_device
+
 API = HfApi(token=os.getenv("HF_TOKEN"))
 
 
 def init_model(args: argparse.Namespace) -> tuple[AutoModelForSeq2SeqLM, AutoTokenizer]:
+    """Initialize translation model and tokenizer.
+
+    Args:
+        args: Command-line arguments containing model path and device.
+
+    Returns:
+        tuple: (model, tokenizer) for translation.
+    """
     model = AutoModelForSeq2SeqLM.from_pretrained(
-        "indictrans2-en-indic-dist-200M",
+        args.model_name_or_path,
         trust_remote_code=True,
         dtype=torch.bfloat16,
         attn_implementation="flex_attention",
     ).to(args.device)
     tokenizer = AutoTokenizer.from_pretrained(
-        "indictrans2-en-indic-dist-200M", trust_remote_code=True
+        args.model_name_or_path, trust_remote_code=True
     )
     return model, tokenizer
 
 
 def save_upload(repo_id: str, batch: dict, counter: int) -> None:
+    """
+    Save batch to parquet and upload to Hugging Face Hub.
+
+    Args:
+        repo_id: Hugging Face repository ID.
+        batch: Dictionary containing image and qa data.
+        counter: Batch counter for filename.
+
+    Returns:
+        None
+    """
     ds = Dataset.from_dict(batch)
     filename = f"train-{counter:010d}.parquet"
     ds.to_parquet(filename)
@@ -42,8 +69,17 @@ def save_upload(repo_id: str, batch: dict, counter: int) -> None:
 
 
 def main(args: argparse.Namespace) -> None:
+    """
+    Main function to translate LNQA dataset and upload to Hugging Face.
+
+    Args:
+        args: Command-line arguments containing paths and configuration.
+
+    Returns:
+        None
+    """
     with open(args.jsonl_path, "r", encoding="utf-8") as f:
-        conversations = [json.loads(f) for f in f.readlines()]
+        conversations = [json.loads(line) for line in f.readlines()]
 
     ## gather the textual contents
     contents = []
@@ -182,13 +218,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--device",
         type=str,
-        default=(
-            "cuda"
-            if torch.cuda.is_available()
-            else "mps"
-            if torch.backends.mps.is_available()
-            else "cpu"
-        ),
+        default=get_device(),
         help="Device to run the model on",
     )
     parser.add_argument(

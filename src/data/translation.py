@@ -9,6 +9,8 @@ import gc
 from IndicTransToolkit import IndicProcessor
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+from src.utils import get_device
+
 
 class TranslationService:
     """
@@ -39,13 +41,7 @@ class TranslationService:
             tgt_lang (str): Target language code (e.g., 'hin_Deva').
             flash_attention (bool): Whether to use Flash Attention 2 for faster inference.
         """
-        self.device = (
-            "cuda"
-            if torch.cuda.is_available()
-            else "mps"
-            if torch.backends.mps.is_available()
-            else "cpu"
-        )
+        self.device = get_device()
 
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang

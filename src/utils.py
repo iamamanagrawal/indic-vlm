@@ -1,7 +1,8 @@
 """Utility functions and constants for the Indic VLM project.
 
 This module provides utilities for chat template processing, model loading,
-and predefined question templates in English and Hindi for image description tasks.
+device detection, and predefined question templates in English and Hindi
+for image description tasks.
 """
 
 import torch
@@ -12,6 +13,21 @@ from transformers import (
     SiglipVisionModel,
 )
 from src.schema import VLMModelConfig
+
+
+def get_device() -> str:
+    """
+    Detect and return the best available device for computation.
+
+    Returns:
+        str: 'cuda' if CUDA is available, 'mps' if MPS is available, else 'cpu'.
+    """
+    if torch.cuda.is_available():
+        return "cuda"
+    elif torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
 
 # Generated image description queries from users from Gemini 3 Flash model
 EN_USERS_QUESTIONS = [
